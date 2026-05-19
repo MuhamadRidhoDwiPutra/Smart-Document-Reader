@@ -1,0 +1,4 @@
+NEXTJS_ENV=development
+GEMINI_API_KEY=
+SESSION_SECRET=change-me-min-32-chars
+SEED_SECRET=local-dev-seed-only
