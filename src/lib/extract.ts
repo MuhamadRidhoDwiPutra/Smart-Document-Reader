@@ -191,13 +191,26 @@ async function runVision(
   mimeType: string
 ): Promise<ExtractionResult> {
   const result = await AI.run(WORKERS_AI_VISION_MODEL, {
-    messages: [
-      { role: "user", content: USER_PROMPT },
-    ],
-    image: imageDataUri(bytes, mimeType),
-    max_tokens: 2048,
-    temperature: 0.1,
-  });
+  messages: [
+    {
+      role: "user",
+      content: [
+        {
+          type: "image_url",
+          image_url: {
+            url: imageDataUri(bytes, mimeType),
+          },
+        },
+        {
+          type: "text",
+          text: USER_PROMPT,
+        },
+      ],
+    },
+  ],
+  max_tokens: 2048,
+  temperature: 0.1,
+});
 
   const text = extractResponseText(result);
 
