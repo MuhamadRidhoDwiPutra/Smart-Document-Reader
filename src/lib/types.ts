@@ -42,7 +42,7 @@ export interface ExtractionResult {
   total: number | null;
   currency: string | null;
   line_items: Array<{
-    description: string;
+    description: string | null;
     quantity: number | null;
     unit_price: number | null;
     amount: number | null;

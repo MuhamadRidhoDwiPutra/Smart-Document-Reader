@@ -5,21 +5,21 @@ import type { ExtractionResult, FieldConfidence } from "./types";
 /** Vision model — free tier ~10k Neurons/hari di Workers Free. */
 export const WORKERS_AI_VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
 
-const USER_PROMPT = `You are an AI that extracts data from receipt/invoice images.
+const USER_PROMPT = `You are an AI that extracts structured data from receipt/invoice images.
 
-Extract the following information:
-- vendor: The store/merchant name (string)
-- document_date: The date on the receipt in YYYY-MM-DD format
-- total: The total amount (number, not string)
-- currency: The currency code like IDR, USD (string)
-- line_items: Array of items with description, quantity, unit_price, amount
-- field_confidence: Confidence scores (0-1) for each field
-- is_receipt: true if this is a receipt/invoice, false otherwise
-- failure_reason: Reason if not a receipt
+Return ONLY a valid JSON object with these exact fields:
+- is_receipt: boolean (true if this is a receipt/invoice)
+- vendor: string or null (store/merchant name)
+- document_date: string or null (date in YYYY-MM-DD format)
+- total: number or null (total amount, as a number not string)
+- currency: string or null (currency code like IDR, USD)
+- line_items: array of items, each with description, quantity, unit_price, amount
+- field_confidence: object with confidence scores 0-1 for each field
+- failure_reason: string or null (reason if not a receipt)
 
-IMPORTANT: Return ONLY a valid JSON object. No markdown, no text before or after.
+IMPORTANT: Return ONLY the JSON. No markdown, no explanation.
 
-Example response:
+Example:
 {"is_receipt":true,"vendor":"Alfamart","document_date":"2024-05-20","total":25000,"currency":"IDR","line_items":[{"description":"Mie Goreng","quantity":1,"unit_price":25000,"amount":25000}],"field_confidence":{"vendor":0.95,"document_date":0.9,"total":0.85,"currency":0.9,"line_items":0.8},"failure_reason":null}`;
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -37,107 +37,143 @@ function imageDataUri(bytes: ArrayBuffer, mimeType: string): string {
   return `data:${mime};base64,${arrayBufferToBase64(bytes)}`;
 }
 
+/**
+ * Extract text from Workers AI response.
+ * Handles various response formats that the AI might return.
+ */
 function extractResponseText(result: unknown): string {
-  if (!result || typeof result !== "object") return "";
+  if (result == null || typeof result !== "object") {
+    return "";
+  }
+
   const r = result as Record<string, unknown>;
 
-  // Workers AI typically returns { response: "..." } or { result: "..." }
+  // Case 1: { response: "..." } - most common from Workers AI
   if (typeof r.response === "string") {
-    // Check if response is a JSON string wrapped inside
-    try {
-      const parsed = JSON.parse(r.response);
-      if (typeof parsed === "object" && parsed !== null) {
-        // It's a JSON string, return it directly
-        return r.response;
-      }
-    } catch {
-      // It's a plain text response, return as-is
-      return r.response;
-    }
+    return r.response;
   }
-  if (typeof r.result === "string") return r.result;
-  if (typeof r.text === "string") return r.text;
 
-  // Sometimes the response is nested in a 'choices' array
-  if (Array.isArray(r.choices)) {
+  // Case 2: { result: "..." } - alternative format
+  if (typeof r.result === "string") {
+    return r.result;
+  }
+
+  // Case 3: { text: "..." } - some models use this
+  if (typeof r.text === "string") {
+    return r.text;
+  }
+
+  // Case 4: { choices: [{ message: { content: "..." } }] } - chat format
+  if (Array.isArray(r.choices) && r.choices.length > 0) {
     const choice = r.choices[0] as Record<string, unknown>;
     if (choice && typeof choice.message === "object") {
       const msg = choice.message as Record<string, unknown>;
-      if (typeof msg.content === "string") return msg.content;
+      if (typeof msg.content === "string") {
+        return msg.content;
+      }
     }
   }
 
+  // Case 5: Fallback - stringify the whole response
   return JSON.stringify(r);
 }
 
-function extractJsonFromText(text: string): string | null {
-  // Try to find JSON object in the text
-  // Handle cases where AI returns {"response": "{...json..."}
+/**
+ * Safe JSON parser with multiple fallback strategies.
+ */
+function safeParseAIResponse(text: string): ExtractionResult | null {
+  if (!text || !text.trim()) {
+    return null;
+  }
+
+  // Strategy 1: Direct parse (when AI returns clean JSON)
   try {
-    const obj = JSON.parse(text);
-    if (typeof obj.response === "string") {
-      // Unwrap the response field which is itself a JSON string
-      return obj.response;
+    const parsed = JSON.parse(text);
+    // If the parsed result is a JSON string (AI wrapped it), parse again
+    if (typeof parsed === "string") {
+      try {
+        const inner = JSON.parse(parsed);
+        if (typeof inner === "object" && inner !== null) {
+          return validateExtractionResult(inner);
+        }
+      } catch {
+        // The string is not JSON, return it as-is
+        return null;
+      }
+    }
+    // If parsed is already an object
+    if (typeof parsed === "object" && parsed !== null) {
+      return validateExtractionResult(parsed);
     }
   } catch {
-    // Continue with other extraction methods
+    // Direct parse failed, try other strategies
   }
 
-  // Try to find JSON object in the text
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    return jsonMatch[0];
-  }
-  return null;
-}
-
-function parseModelJson(text: string): ExtractionResult {
-  const trimmed = text.trim();
-
-  // Remove markdown code blocks if present
-  let cleaned = trimmed
+  // Strategy 2: Strip markdown code blocks
+  const stripped = text
     .replace(/^```json\s*/i, "")
     .replace(/^```\s*/i, "")
     .replace(/```\s*$/i, "")
     .trim();
 
-  // Try direct parse first
   try {
-    const parsed = JSON.parse(cleaned) as ExtractionResult;
-    if (typeof parsed.is_receipt !== "boolean") {
-      throw new Error("Missing is_receipt field");
+    const parsed = JSON.parse(stripped);
+    if (typeof parsed === "object" && parsed !== null) {
+      return validateExtractionResult(parsed);
     }
-    if (!parsed.field_confidence) parsed.field_confidence = {} as FieldConfidence;
-    if (!Array.isArray(parsed.line_items)) parsed.line_items = [];
-    return parsed;
   } catch {
-    // Try to extract JSON from text if direct parse fails
-    const extracted = extractJsonFromText(cleaned);
-    if (extracted) {
-      try {
-        const parsed = JSON.parse(extracted) as ExtractionResult;
-        if (typeof parsed.is_receipt !== "boolean") {
-          throw new Error("Missing is_receipt field");
-        }
-        if (!parsed.field_confidence) parsed.field_confidence = {} as FieldConfidence;
-        if (!Array.isArray(parsed.line_items)) parsed.line_items = [];
-        return parsed;
-      } catch {
-        // Fall through to error response
+    // Stripped parse failed, try regex extraction
+  }
+
+  // Strategy 3: Extract JSON object using regex
+  const jsonMatch = stripped.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (typeof parsed === "object" && parsed !== null) {
+        return validateExtractionResult(parsed);
       }
+    } catch {
+      // Regex extraction failed
     }
   }
 
-  // If all parsing fails, return failure response with a user-friendly message
+  // All strategies failed
+  return null;
+}
+
+/**
+ * Validate that a parsed object has the required ExtractionResult structure.
+ */
+function validateExtractionResult(obj: unknown): ExtractionResult | null {
+  if (typeof obj !== "object" || obj === null) {
+    return null;
+  }
+
+  const result = obj as Record<string, unknown>;
+
+  // Check for is_receipt field (required)
+  if (typeof result.is_receipt !== "boolean") {
+    return null;
+  }
+
+  // Build the extraction result with defaults for missing fields
   return {
-    is_receipt: false,
-    vendor: null,
-    document_date: null,
-    total: null,
-    currency: null,
-    line_items: [],
-    field_confidence: {},
-    failure_reason: "Gagal membaca data dari gambar. Silakan input manual atau coba lagi.",
+    is_receipt: result.is_receipt,
+    vendor: result.vendor == null ? null : String(result.vendor),
+    document_date: result.document_date == null ? null : String(result.document_date),
+    total: result.total == null ? null : Number(result.total),
+    currency: result.currency == null ? null : String(result.currency),
+    line_items: Array.isArray(result.line_items) ? result.line_items.map((item) => ({
+      description: item?.description == null ? null : String(item.description),
+      quantity: item?.quantity == null ? null : Number(item.quantity),
+      unit_price: item?.unit_price == null ? null : Number(item.unit_price),
+      amount: item?.amount == null ? null : Number(item.amount),
+    })) : [],
+    field_confidence: (typeof result.field_confidence === "object" && result.field_confidence !== null)
+      ? result.field_confidence as FieldConfidence
+      : {},
+    failure_reason: result.failure_reason == null ? null : String(result.failure_reason),
   };
 }
 
@@ -156,23 +192,46 @@ async function runVision(
 ): Promise<ExtractionResult> {
   const result = await AI.run(WORKERS_AI_VISION_MODEL, {
     messages: [
-      {
-        role: "system",
-        content:
-          "You extract structured data from receipt photos. Respond with a single JSON object only, no markdown.",
-      },
       { role: "user", content: USER_PROMPT },
     ],
     image: imageDataUri(bytes, mimeType),
     max_tokens: 2048,
-    temperature: 0.2,
+    temperature: 0.1,
   });
 
   const text = extractResponseText(result);
-  if (!text.trim()) {
-    throw new Error("Workers AI returned an empty response.");
+
+  if (!text || !text.trim()) {
+    return {
+      is_receipt: false,
+      vendor: null,
+      document_date: null,
+      total: null,
+      currency: null,
+      line_items: [],
+      field_confidence: {},
+      failure_reason: "AI tidak memberikan respons. Silakan coba lagi.",
+    };
   }
-  return parseModelJson(text);
+
+  // Try to parse the response
+  const extraction = safeParseAIResponse(text);
+
+  if (extraction) {
+    return extraction;
+  }
+
+  // All parsing strategies failed
+  return {
+    is_receipt: false,
+    vendor: null,
+    document_date: null,
+    total: null,
+    currency: null,
+    line_items: [],
+    field_confidence: {},
+    failure_reason: "Gagal membaca data dari gambar. Silakan input manual atau coba lagi.",
+  };
 }
 
 export async function extractFromImage(
@@ -189,15 +248,23 @@ export async function extractFromImage(
       line_items: [],
       field_confidence: {},
       failure_reason:
-        "PDF belum didukung untuk Workers AI vision. Unggah foto struk (JPG/PNG/WebP).",
+        "PDF belum didukung. Silakan upload foto struk (JPG/PNG/WebP).",
     };
   }
 
   const { AI } = getEnv();
   if (!AI) {
-    throw new Error(
-      "Workers AI binding tidak tersedia. Tambahkan blok ai { binding = \"AI\" } di wrangler.jsonc."
-    );
+    return {
+      is_receipt: false,
+      vendor: null,
+      document_date: null,
+      total: null,
+      currency: null,
+      line_items: [],
+      field_confidence: {},
+      failure_reason:
+        "Workers AI belum dikonfigurasi. Tambahkan binding AI di wrangler.jsonc.",
+    };
   }
 
   try {
@@ -205,10 +272,32 @@ export async function extractFromImage(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (needsMetaLicenseAcceptance(msg)) {
-      await acceptMetaLicense(AI);
-      return await runVision(AI, bytes, mimeType);
+      try {
+        await acceptMetaLicense(AI);
+        return await runVision(AI, bytes, mimeType);
+      } catch {
+        return {
+          is_receipt: false,
+          vendor: null,
+          document_date: null,
+          total: null,
+          currency: null,
+          line_items: [],
+          field_confidence: {},
+          failure_reason: "Lisensi Meta belum disetujui. Jalankan: npm run workers-ai:agree",
+        };
+      }
     }
-    throw err;
+    return {
+      is_receipt: false,
+      vendor: null,
+      document_date: null,
+      total: null,
+      currency: null,
+      line_items: [],
+      field_confidence: {},
+      failure_reason: msg || "Terjadi kesalahan saat ekstraksi.",
+    };
   }
 }
 
