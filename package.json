@@ -12,10 +12,10 @@
     "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "db:migrate:local": "wrangler d1 execute smart-doc-db --local --file=./migrations/0001_init.sql",
-    "db:migrate:remote": "wrangler d1 execute smart-doc-db --remote --file=./migrations/0001_init.sql"
+    "db:migrate:remote": "wrangler d1 execute smart-doc-db --remote --file=./migrations/0001_init.sql",
+    "workers-ai:agree": "node scripts/workers-ai-agree.mjs"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.0",
     "@opennextjs/cloudflare": "^1.19.0",
     "next": "^15.3.0",
     "react": "^19.0.0",

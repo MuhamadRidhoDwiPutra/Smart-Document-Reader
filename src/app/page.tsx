@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
 export default function Home() {
-  redirect("/documents");
+  // Redirect to login page first
+  redirect("/login");
 }

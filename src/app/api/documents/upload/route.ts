@@ -3,8 +3,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { getEnv } from "@/lib/env";
 import { processDocument } from "@/lib/documents";
 
+export const runtime = "nodejs";
+
 const MAX = 10 * 1024 * 1024;
-const ALLOWED = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
 
 export async function POST(request: Request) {
   const user = await getCurrentUser(request);
@@ -15,7 +17,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "File wajib." }, { status: 400 });
   }
   if (!ALLOWED.includes(file.type)) {
-    return NextResponse.json({ error: "Format: JPG, PNG, WebP, PDF." }, { status: 400 });
+    return NextResponse.json({ error: "Format: JPG, PNG, WebP (foto struk)." }, { status: 400 });
   }
   const bytes = await file.arrayBuffer();
   if (bytes.byteLength > MAX) {

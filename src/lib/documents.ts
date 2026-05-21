@@ -1,6 +1,7 @@
 import { getEnv, getLowConfidenceThreshold } from "./env";
 import type { Document, DocumentStatus, LineItem } from "./types";
-import { extractFromImage, needsReview } from "./gemini";
+import { formatExtractionError } from "./errors";
+import { extractFromImage, needsReview } from "./extract";
 
 function parseDoc(row: Document): Document {
   return {
@@ -52,7 +53,7 @@ export async function getDocument(
   )
     .bind(docId)
     .all<LineItem>();
-  const line_items = (results ?? []).map((li) => ({
+  const line_items = (results ?? []).map((li: LineItem) => ({
     ...li,
     field_confidence:
       typeof li.field_confidence === "string"
@@ -150,7 +151,7 @@ export async function processDocument(userId: string, docId: string): Promise<vo
         .run();
     }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Extraction failed";
+    const msg = formatExtractionError(err);
     await DB.prepare(
       `UPDATE documents SET status = ?, error_message = ?, updated_at = ? WHERE id = ?`
     )
@@ -193,4 +194,26 @@ export async function saveDocument(
       .bind(li.id ?? crypto.randomUUID(), docId, i, li.description, li.quantity, li.unit_price, li.amount)
       .run();
   }
+}
+
+export async function deleteDocument(userId: string, docId: string): Promise<boolean> {
+  const { DB, UPLOADS } = getEnv();
+  const doc = await DB.prepare(
+    `SELECT file_key FROM documents WHERE id = ? AND user_id = ?`
+  )
+    .bind(docId, userId)
+    .first<{ file_key: string }>();
+  if (!doc) return false;
+
+  await DB.prepare(`DELETE FROM line_items WHERE document_id = ?`).bind(docId).run();
+  await DB.prepare(`DELETE FROM documents WHERE id = ? AND user_id = ?`)
+    .bind(docId, userId)
+    .run();
+
+  try {
+    await UPLOADS.delete(doc.file_key);
+  } catch {
+    // ignore missing object in R2
+  }
+  return true;
 }

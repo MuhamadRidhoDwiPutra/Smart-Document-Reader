@@ -18,7 +18,7 @@ export default function RegisterPage() {
       body: JSON.stringify({ email, password }),
     });
     if (!res.ok) {
-      const d = await res.json();
+      const d = await res.json() as { error?: string };
       setError(d.error ?? "Gagal");
       return;
     }

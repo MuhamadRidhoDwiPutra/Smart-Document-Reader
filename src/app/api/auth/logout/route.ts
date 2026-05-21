@@ -1,14 +1,16 @@
-import { NextResponse } from "next/dist/server/web/response";
-import { clearSessionCookie } from "@/lib/auth";
+import { NextResponse } from "next/server";
 import { getSessionIdFromCookie } from "@/lib/session";
 import { getEnv } from "@/lib/env";
+import { cookies } from "next/headers";
 
 export async function POST(request: Request) {
   const sessionId = getSessionIdFromCookie(request.headers.get("cookie"));
   if (sessionId) {
     await getEnv().DB.prepare(`DELETE FROM sessions WHERE id = ?`).bind(sessionId).run();
   }
-  const res = NextResponse.json({ ok: true });
-  res.headers.set("Set-Cookie", clearSessionCookie());
-  return res;
+
+  const cookieStore = await cookies();
+  cookieStore.delete("sdr_session");
+
+  return NextResponse.json({ ok: true });
 }

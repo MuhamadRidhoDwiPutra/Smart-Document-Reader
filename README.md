@@ -1,6 +1,6 @@
 # Smart Document Reader
 
-Aplikasi ekstraksi resi/invoice dengan **Next.js 15**, **Cloudflare Workers** (OpenNext), **D1**, **R2**, dan **Gemini Vision**.
+Aplikasi ekstraksi resi/invoice dengan **Next.js 15**, **Cloudflare Workers** (OpenNext), **D1**, **R2**, dan **Cloudflare Workers AI** (vision).
 
 ## Stack
 
@@ -10,122 +10,175 @@ Aplikasi ekstraksi resi/invoice dengan **Next.js 15**, **Cloudflare Workers** (O
 | Runtime | Cloudflare Workers via `@opennextjs/cloudflare` |
 | Database | Cloudflare D1 (users, sessions, documents, line_items) |
 | Storage | Cloudflare R2 (file upload) |
-| AI | Google Gemini (`gemini-2.0-flash`) Vision |
+| OCR/AI | **Workers AI** — `@cf/meta/llama-3.2-11b-vision-instruct` |
 
-## Setup lokal
+### Alasan pilihan Workers AI (akurasi, biaya, kecepatan)
+
+| Kriteria | Workers AI |
+|----------|------------|
+| **Akurasi** | Model vision Llama 3.2 cukup untuk struk/invoice Indonesia; output JSON terstruktur via prompt |
+| **Biaya** | **Gratis** ~10.000 Neurons/hari (Workers Free); cukup untuk development & demo tes |
+| **Kecepatan** | Satu request di edge Cloudflare; tidak perlu API key pihak ketiga |
+| **Stack kantor** | Selaras brief: Workers + D1 + R2 tanpa billing Google |
+
+**Tidak perlu** Google AI Studio / `GEMINI_API_KEY`.
+
+---
+
+## Troubleshooting: `npm run dev` gagal
+
+### Error: "register a workers.dev subdomain" (kode 10063)
+
+**Wajib sekali (gratis):**
+
+1. Buka https://dash.cloudflare.com  
+2. Klik **Workers & Pages** di menu kiri (tunggu halaman load — subdomain `*.workers.dev` dibuat otomatis)  
+3. Jalankan lagi:
+   ```bash
+   npm run workers-ai:agree
+   npm run dev
+   ```
+
+### Error R2: "Please enable R2" (kode 10042)
+
+Hanya untuk **deploy/production**. Untuk **lokal**, R2 disimulasikan Miniflare — **tidak perlu** `wrangler r2 bucket create` jika hanya `npm run dev`.
+
+Aktifkan R2 di dashboard hanya jika akan `npm run deploy`.
+
+### Database sudah ada
+
+Pesan `database with that name already exists` = **normal**. Pakai `database_id` yang sudah di `wrangler.jsonc`.
+
+---
+
+## Yang perlu disiapkan (checklist)
+
+### 1. Akun & tools di komputer
+
+- [ ] Akun [Cloudflare](https://dash.cloudflare.com/sign-up) (gratis)
+- [ ] Node.js 18+ dan npm
+- [ ] Git
+- [ ] Login Wrangler: `npx wrangler login`
+
+### 2. Resource Cloudflare (sekali)
 
 ```bash
 npm install
-cp .dev.vars.example .dev.vars
-# Isi GEMINI_API_KEY, SESSION_SECRET, SEED_SECRET
-```
 
-### Cloudflare resources
-
-```bash
+# Database D1
 npx wrangler d1 create smart-doc-db
-# Salin database_id ke wrangler.jsonc
+# Salin database_id ke wrangler.jsonc (ganti REPLACE_WITH_YOUR_D1_DATABASE_ID)
 
+# Bucket file (aktifkan R2 di dashboard jika diminta)
 npx wrangler r2 bucket create smart-doc-uploads
 
+# Migrasi tabel
 npm run db:migrate:local
 ```
 
-### Seed akun demo
+### 3. Environment lokal
+
+```bash
+copy .dev.vars.example .dev.vars   # Windows
+# atau: cp .dev.vars.example .dev.vars
+```
+
+Isi `.dev.vars`:
+
+```env
+SESSION_SECRET=string-acak-minimal-32-karakter
+SEED_SECRET=local-dev-seed-only
+```
+
+**Tidak ada** `GEMINI_API_KEY`.
+
+### 4. Lisensi Meta (sekali per akun Cloudflare)
+
+Model vision wajib disetujui sekali:
+
+```bash
+npm run workers-ai:agree
+```
+
+Atau saat ekstraksi pertama, aplikasi mencoba `prompt: "agree"` otomatis.
+
+### 5. Jalankan aplikasi
 
 ```bash
 npm run dev
-# Di terminal lain (setelah app jalan dengan binding lokal):
-curl -X POST http://localhost:3000/api/seed-demo -H "x-seed-secret: local-dev-seed-only"
 ```
 
-**Demo login:** `demo@smartdoc.local` / `demo12345`
+Buka http://localhost:3000 → register/login → upload **foto** struk (JPG/PNG/WebP).
 
-### Preview Workers runtime
-
-```bash
-npm run preview
-```
-
-### Deploy
+### 6. Deploy (submit tes)
 
 ```bash
-npx wrangler secret put GEMINI_API_KEY
 npx wrangler secret put SESSION_SECRET
 npx wrangler secret put SEED_SECRET
 npm run db:migrate:remote
 npm run deploy
 ```
 
+Jalankan `npm run workers-ai:agree` terhadap akun production jika belum.
+
+---
+
+## Setup lokal (ringkas)
+
+```bash
+npm install
+cp .dev.vars.example .dev.vars
+npm run db:migrate:local
+npm run workers-ai:agree
+npm run dev
+```
+
+### Seed akun demo
+
+```bash
+curl -X POST http://localhost:3000/api/seed-demo -H "x-seed-secret: local-dev-seed-only"
+```
+
+**Demo login:** `demo@smartdoc.local` / `demo12345`
+
+---
+
 ## Fitur
 
 - Register / login (PBKDF2-SHA256, session di D1)
-- Halaman protected (middleware)
-- Upload → R2 + D1 (`uploaded` → `processing` → ekstraksi)
-- Gemini Vision: vendor, tanggal, total, currency, line items + `field_confidence`
-- UI review dengan highlight field confidence &lt; 0.7
-- Simpan koreksi → status `saved`
-- Gagal / bukan resi → `failed` + pesan
-- Daftar dokumen + filter vendor/tanggal + export CSV
+- Upload foto struk → R2 + ekstraksi Workers AI
+- Review & koreksi + confidence field
+- Daftar, filter, export CSV, hapus dokumen
 
 ## AI workflow & contoh prompt
 
-Prompt sistem ada di `src/lib/gemini.ts`. Model menerima gambar/PDF sebagai inline base64 dan mengembalikan JSON terstruktur.
+Prompt di `src/lib/extract.ts`. Model menerima gambar sebagai data URI base64.
 
-**Contoh hasil yang diharapkan:**
+**Contoh prompt penentuan:**
 
-```json
-{
-  "is_receipt": true,
-  "vendor": "Indomaret",
-  "document_date": "2025-05-10",
-  "total": 125000,
-  "currency": "IDR",
-  "line_items": [{ "description": "Kopi", "quantity": 2, "unit_price": 15000, "amount": 30000 }],
-  "field_confidence": { "vendor": 0.95, "document_date": 0.8, "total": 0.9, "currency": 0.99, "line_items": 0.75 },
-  "failure_reason": null
-}
+```
+Analyze this receipt/invoice image. Return ONLY valid JSON:
+{"is_receipt":boolean,"vendor":...,"field_confidence":{...}}
 ```
 
-**Handling akurasi rendah:** threshold default `0.7` (`LOW_CONFIDENCE_THRESHOLD` di wrangler). Status `needs_review`; field ditandai di form review.
-
-## Tools AI yang dipakai (wajib brief)
+## Tools AI (brief)
 
 | Bagian | Tool |
 |--------|------|
-| Scaffold project, API, UI, migrasi | **Cursor Agent** |
-| Ekstraksi OCR/vision runtime | **Google Gemini API** |
-| (Opsional) iterasi prompt | Edit manual + uji di Google AI Studio |
+| Scaffold, API, UI | **Cursor Agent** |
+| Ekstraksi vision | **Cloudflare Workers AI** |
+| Iterasi prompt | Edit `src/lib/extract.ts` |
 
-## Asumsi & keterbatasan (jujur)
+## Keterbatasan
 
-- PDF multi-halaman: hanya halaman pertama yang dikirim ke Gemini (belum split).
-- File &gt; ~4 MB base64 bisa lambat/gagal di Workers — batas upload 10 MB.
-- Semua query dokumen memfilter `user_id` (tidak pakai localStorage untuk data dokumen).
-- `SESSION_SECRET` disiapkan untuk rotasi/validasi lanjutan; saat ini session ID acak di D1.
-
-## Improvement jika waktu 2×
-
-- Background queue (Queues) untuk ekstraksi async
-- Multi-page PDF
-- Retry Gemini + fallback model
-- Unit test untuk `password.ts` dan parser JSON
-- Dashboard analytics per vendor
-
-## Akun demo (production)
-
-Setelah deploy, jalankan seed sekali:
-
-```bash
-curl -X POST https://YOUR_URL/api/seed-demo -H "x-seed-secret: YOUR_SEED_SECRET"
-```
+- **PDF** tidak didukung Workers AI vision — gunakan foto JPG/PNG
+- Kuota gratis ~10k Neurons/hari; hindari spam ekstraksi ulang
+- File upload maks. 10 MB
 
 ## Struktur folder
 
 ```
-src/
-  app/          # pages + API routes
-  components/   # UI
-  lib/          # auth, gemini, documents, db helpers
-migrations/     # D1 SQL
+src/lib/extract.ts   # Workers AI vision + JSON parse
+src/lib/documents.ts # D1 + R2
+wrangler.jsonc       # binding DB, UPLOADS, AI
 ```

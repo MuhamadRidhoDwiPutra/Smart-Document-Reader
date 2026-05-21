@@ -3,10 +3,15 @@ import { getEnv } from "./env";
 export const COOKIE_NAME = "sdr_session";
 const SESSION_DAYS = 14;
 
+// Check if we're running on localhost (HTTP) vs production (HTTPS)
+const IS_LOCALHOST = process.env.NEXTJS_ENV === "development" ||
+  process.env.NODE_ENV === "development" ||
+  process.env.WATCH === "true";
+
 export function sessionCookieOptions(maxAge: number) {
   return {
     httpOnly: true,
-    secure: true,
+    secure: !IS_LOCALHOST, // Secure only in production (HTTPS)
     sameSite: "lax" as const,
     path: "/",
     maxAge,

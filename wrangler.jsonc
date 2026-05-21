@@ -18,7 +18,7 @@
     {
       "binding": "DB",
       "database_name": "smart-doc-db",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+      "database_id": "cf10b7d3-1c32-4cb2-a269-7b3e273286de"
     }
   ],
   "r2_buckets": [
@@ -27,6 +27,10 @@
       "bucket_name": "smart-doc-uploads"
     }
   ],
+  "ai": {
+    "binding": "AI",
+    "remote": true
+  },
   "vars": {
     "LOW_CONFIDENCE_THRESHOLD": "0.7"
   }
