@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Smart Document Reader",
-  description: "Receipt extraction with Gemini Vision on Cloudflare",
+  description: "Receipt extraction with Cloudflare Workers AI Vision",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
