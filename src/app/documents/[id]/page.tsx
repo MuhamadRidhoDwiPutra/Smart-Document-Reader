@@ -59,7 +59,7 @@ export default function ReviewPage() {
       })),
     });
     setConfidence(document.field_confidence ?? null);
-    setHasChanges(false);
+    setHasChanges(true);
   }, []);
 
   const load = useCallback(async () => {
@@ -132,6 +132,8 @@ export default function ReviewPage() {
         setDoc(responseData.document);
         // Update form with saved data
         mapToForm(responseData.document);
+        // Redirect to dashboard after successful save
+        router.push("/documents");
       } else {
         const errorData = await res.json() as { error?: string };
         console.error("[ReviewPage] Save failed:", errorData);
@@ -440,10 +442,7 @@ export default function ReviewPage() {
                   Menyimpan...
                 </>
               ) : (
-                <>
-                  💾 Simpan Data
-                  {hasChanges && <span className="text-xs opacity-75">(belum tersimpan)</span>}
-                </>
+                "💾 Simpan Data"
               )}
             </button>
           </div>
