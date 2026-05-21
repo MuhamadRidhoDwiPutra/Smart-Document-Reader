@@ -179,21 +179,65 @@ export async function saveDocument(
 ): Promise<void> {
   const { DB } = getEnv();
   const now = Date.now();
-  await DB.prepare(
-    `UPDATE documents SET vendor = ?, document_date = ?, total = ?, currency = ?, status = ?, updated_at = ? WHERE id = ? AND user_id = ?`
-  )
-    .bind(data.vendor, data.document_date, data.total, data.currency, "saved", now, docId, userId)
-    .run();
-  await DB.prepare(`DELETE FROM line_items WHERE document_id = ?`).bind(docId).run();
+
+  console.log("[saveDocument] Starting save:", {
+    userId,
+    docId,
+    vendor: data.vendor,
+    document_date: data.document_date,
+    total: data.total,
+    currency: data.currency,
+    line_items_count: data.line_items.length,
+  });
+
+  // Update document
+  try {
+    const updateResult = await DB.prepare(
+      `UPDATE documents SET vendor = ?, document_date = ?, total = ?, currency = ?, status = ?, updated_at = ? WHERE id = ? AND user_id = ?`
+    )
+      .bind(data.vendor, data.document_date, data.total, data.currency, "saved", now, docId, userId)
+      .run();
+
+    console.log("[saveDocument] Document update result:", updateResult.success);
+  } catch (err) {
+    console.error("[saveDocument] Document update error:", err);
+    throw err;
+  }
+
+  // Delete existing line items
+  try {
+    await DB.prepare(`DELETE FROM line_items WHERE document_id = ?`).bind(docId).run();
+    console.log("[saveDocument] Existing line items deleted");
+  } catch (err) {
+    console.error("[saveDocument] Delete line items error:", err);
+    throw err;
+  }
+
+  // Insert new line items
   for (let i = 0; i < data.line_items.length; i++) {
     const li = data.line_items[i];
-    await DB.prepare(
-      `INSERT INTO line_items (id, document_id, line_order, description, quantity, unit_price, amount)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    )
-      .bind(li.id ?? crypto.randomUUID(), docId, i, li.description, li.quantity, li.unit_price, li.amount)
-      .run();
+    try {
+      await DB.prepare(
+        `INSERT INTO line_items (id, document_id, line_order, description, quantity, unit_price, amount)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+        .bind(
+          li.id || crypto.randomUUID(),
+          docId,
+          i,
+          li.description,
+          li.quantity,
+          li.unit_price,
+          li.amount
+        )
+        .run();
+    } catch (err) {
+      console.error(`[saveDocument] Line item ${i} insert error:`, err);
+      // Continue with other items
+    }
   }
+
+  console.log("[saveDocument] Save completed successfully");
 }
 
 export async function deleteDocument(userId: string, docId: string): Promise<boolean> {

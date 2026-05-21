@@ -97,32 +97,53 @@ export default function ReviewPage() {
   async function save() {
     setSaving(true);
     setMsg("");
-    const res = await fetch(`/api/documents/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        vendor: form.vendor || null,
-        document_date: form.documentDate || null,
-        total: form.total ? parseFloat(form.total) : null,
-        currency: form.currency || null,
-        line_items: form.lineItems.map((li) => ({
-          id: li.id || crypto.randomUUID(),
-          description: li.description || null,
-          quantity: li.quantity ? parseFloat(li.quantity) : null,
-          unit_price: li.unitPrice ? parseFloat(li.unitPrice) : null,
-          amount: li.amount ? parseFloat(li.amount) : null,
-        })),
-      }),
-    });
-    setSaving(false);
-    if (res.ok) {
-      setMsg("Data berhasil disimpan!");
-      setMsgType("success");
-      setHasChanges(false);
-      await load();
-    } else {
-      setMsg("Gagal menyimpan data.");
+
+    // Build the payload
+    const payload = {
+      vendor: form.vendor || null,
+      document_date: form.documentDate || null,
+      total: form.total ? parseFloat(form.total) : null,
+      currency: form.currency || null,
+      line_items: form.lineItems.map((li) => ({
+        description: li.description || null,
+        quantity: li.quantity ? parseFloat(li.quantity) : null,
+        unit_price: li.unitPrice ? parseFloat(li.unitPrice) : null,
+        amount: li.amount ? parseFloat(li.amount) : null,
+      })),
+    };
+
+    console.log("[ReviewPage] Saving payload:", JSON.stringify(payload, null, 2));
+
+    try {
+      const res = await fetch(`/api/documents/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      console.log("[ReviewPage] Response status:", res.status);
+
+      if (res.ok) {
+        const responseData = await res.json() as { document: Document & { line_items: LineItem[] } };
+        console.log("[ReviewPage] Save successful, document:", responseData.document?.id);
+        setMsg("Data berhasil disimpan!");
+        setMsgType("success");
+        setHasChanges(false);
+        setDoc(responseData.document);
+        // Update form with saved data
+        mapToForm(responseData.document);
+      } else {
+        const errorData = await res.json() as { error?: string };
+        console.error("[ReviewPage] Save failed:", errorData);
+        setMsg(errorData.error || "Gagal menyimpan data.");
+        setMsgType("error");
+      }
+    } catch (err) {
+      console.error("[ReviewPage] Save error:", err);
+      setMsg("Terjadi kesalahan saat menyimpan. Silakan coba lagi.");
       setMsgType("error");
+    } finally {
+      setSaving(false);
     }
   }
 
