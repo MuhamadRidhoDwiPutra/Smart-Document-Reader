@@ -46,7 +46,7 @@ export async function loginUser(
     `SELECT id, password_hash FROM users WHERE email = ?`
   )
     .bind(normalized)
-    .first<{ id: string; password_hash: string }>();
+    .first();
   if (!row || !(await verifyPassword(password, row.password_hash))) {
     return { ok: false, error: "Email atau password salah." };
   }
@@ -63,7 +63,7 @@ export async function getCurrentUser(
   const { DB } = getEnv();
   return DB.prepare(`SELECT id, email FROM users WHERE id = ?`)
     .bind(userId)
-    .first<UserRow>();
+    .first();
 }
 
 export function buildSessionCookie(sessionId: string): string {

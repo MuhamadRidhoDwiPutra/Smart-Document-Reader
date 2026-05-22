@@ -26,7 +26,7 @@ export async function GET(request: Request) {
       `SELECT description, quantity, unit_price, amount FROM line_items WHERE document_id = ? ORDER BY line_order`
     )
       .bind(doc.id)
-      .all<{ description: string | null; quantity: number | null; unit_price: number | null; amount: number | null }>();
+      .all();
     const items = results ?? [];
     const base = [doc.id, doc.vendor, doc.document_date, doc.total, doc.currency, doc.status];
     if (!items.length) {

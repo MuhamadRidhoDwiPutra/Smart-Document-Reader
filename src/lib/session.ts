@@ -40,7 +40,7 @@ export async function getSessionUserId(
     `SELECT user_id, expires_at FROM sessions WHERE id = ?`
   )
     .bind(sessionId)
-    .first<{ user_id: string; expires_at: number }>();
+    .first();
   if (!row || row.expires_at < Date.now()) {
     if (row) {
       await DB.prepare(`DELETE FROM sessions WHERE id = ?`).bind(sessionId).run();

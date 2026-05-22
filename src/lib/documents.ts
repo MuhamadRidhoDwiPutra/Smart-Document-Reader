@@ -33,7 +33,7 @@ export async function listDocuments(
     binds.push(filters.dateTo);
   }
   sql += ` ORDER BY created_at DESC`;
-  const { results } = await DB.prepare(sql).bind(...binds).all<Document>();
+  const { results } = await DB.prepare(sql).bind(...binds).all();
   return (results ?? []).map(parseDoc);
 }
 
@@ -46,13 +46,13 @@ export async function getDocument(
     `SELECT * FROM documents WHERE id = ? AND user_id = ?`
   )
     .bind(docId, userId)
-    .first<Document>();
+    .first();
   if (!doc) return null;
   const { results } = await DB.prepare(
     `SELECT * FROM line_items WHERE document_id = ? ORDER BY line_order`
   )
     .bind(docId)
-    .all<LineItem>();
+    .all();
   const line_items = (results ?? []).map((li: LineItem) => ({
     ...li,
     field_confidence:
@@ -69,7 +69,7 @@ export async function processDocument(userId: string, docId: string): Promise<vo
     `SELECT file_key, mime_type FROM documents WHERE id = ? AND user_id = ?`
   )
     .bind(docId, userId)
-    .first<{ file_key: string; mime_type: string | null }>();
+    .first();
   if (!doc) return;
 
   await DB.prepare(
@@ -246,7 +246,7 @@ export async function deleteDocument(userId: string, docId: string): Promise<boo
     `SELECT file_key FROM documents WHERE id = ? AND user_id = ?`
   )
     .bind(docId, userId)
-    .first<{ file_key: string }>();
+    .first();
   if (!doc) return false;
 
   await DB.prepare(`DELETE FROM line_items WHERE document_id = ?`).bind(docId).run();

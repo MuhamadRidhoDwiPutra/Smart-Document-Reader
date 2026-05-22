@@ -13,7 +13,7 @@ export async function GET(request: Request, { params }: P) {
     `SELECT file_key, mime_type, original_filename FROM documents WHERE id = ? AND user_id = ?`
   )
     .bind(id, user.id)
-    .first<{ file_key: string; mime_type: string | null; original_filename: string | null }>();
+    .first();
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const obj = await UPLOADS.get(row.file_key);
   if (!obj) return NextResponse.json({ error: "File missing" }, { status: 404 });

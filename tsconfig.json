@@ -1,5 +1,5 @@
 {
-  "compilerOptions": {
+ "compilerOptions": {
   "target": "ES2017",
   "lib": ["dom", "dom.iterable", "esnext"],
   "allowJs": true,
@@ -14,7 +14,7 @@
   "jsx": "preserve",
   "incremental": true,
 
-  "ignoreDeprecations": "6.0",
+  "types": ["@cloudflare/workers-types"],
 
   "baseUrl": ".",
   "paths": {

@@ -246,7 +246,7 @@ export default function ReviewPage() {
             <div className="flex-1">
               <h3 className="font-medium text-[var(--accent)] mb-1">Data Hasil Ekstraksi Otomatis</h3>
               <p className="text-sm text-[var(--muted)]">
-                Data di bawah sudah diisi otomatis oleh AI. Silakan periksa dan ubah jika perlu, lalu klik <strong>"Simpan"</strong> untuk menyimpan.
+                Data di bawah sudah diisi otomatis oleh AI. Silakan periksa dan ubah jika perlu, lalu klik <strong>&quot;Simpan&quot;</strong> untuk menyimpan.
               </p>
             </div>
           </div>
@@ -358,7 +358,7 @@ export default function ReviewPage() {
             </div>
 
             {form.lineItems.length === 0 ? (
-              <p className="text-sm text-[var(--muted)] text-center py-4">Belum ada item. Klik "+ Tambah Item" untuk menambahkan.</p>
+              <p className="text-sm text-[var(--muted)] text-center py-4">Belum ada item. Klik &quot;+ Tambah Item&quot; untuk menambahkan.</p>
             ) : (
               <div className="space-y-2">
                 {/* Header */}
