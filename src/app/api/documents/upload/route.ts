@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { getEnv } from "@/lib/env";
+import { getEnv } from "../../../../../env";
 import { processDocument } from "@/lib/documents";
 
 export const runtime = "nodejs";

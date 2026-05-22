@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionIdFromCookie } from "@/lib/session";
-import { getEnv } from "@/lib/env";
+import { getEnv } from "../../../../../env";
 import { cookies } from "next/headers";
 
 export async function POST(request: Request) {

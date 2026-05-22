@@ -1,4 +1,4 @@
-import { getEnv } from "./env";
+import { getEnv } from "../../env";
 
 export const COOKIE_NAME = "sdr_session";
 const SESSION_DAYS = 14;

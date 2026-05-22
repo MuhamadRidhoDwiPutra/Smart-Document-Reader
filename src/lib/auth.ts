@@ -1,4 +1,4 @@
-import { getEnv } from "./env";
+import { getEnv } from "../../env";
 import { hashPassword, verifyPassword } from "./password";
 import {
   COOKIE_NAME,

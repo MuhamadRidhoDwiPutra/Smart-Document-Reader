@@ -1,5 +1,5 @@
 /// <reference path="../../cloudflare-env.d.ts" />
-import { getEnv } from "./env";
+import { getEnv } from "../../env";
 import type { ExtractionResult, FieldConfidence } from "./types";
 
 /** Vision model — free tier ~10k Neurons/hari di Workers Free. */
