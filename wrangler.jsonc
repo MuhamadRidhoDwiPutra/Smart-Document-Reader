@@ -3,17 +3,19 @@
   "name": "smart-document-reader",
   "main": ".open-next/worker.js",
   "compatibility_date": "2024-12-30",
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+
+  "compatibility_flags": [
+    "nodejs_compat",
+    "global_fetch_strictly_public"
+  ],
+
+  "account_id": "48fc0befcb839e9c67fbded2c9e3594b",
+
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
-  "services": [
-    {
-      "binding": "WORKER_SELF_REFERENCE",
-      "service": "smart-document-reader"
-    }
-  ],
+
   "d1_databases": [
     {
       "binding": "DB",
@@ -21,16 +23,19 @@
       "database_id": "cf10b7d3-1c32-4cb2-a269-7b3e273286de"
     }
   ],
+
   "r2_buckets": [
     {
       "binding": "UPLOADS",
       "bucket_name": "smart-doc-uploads"
     }
   ],
+
   "ai": {
     "binding": "AI",
     "remote": true
   },
+
   "vars": {
     "LOW_CONFIDENCE_THRESHOLD": "0.7"
   }
