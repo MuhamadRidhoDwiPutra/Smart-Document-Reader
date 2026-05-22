@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { getEnv } from "../../../../../../env";
+import { getEnv } from "../../../../../lib/env";
 
 type P = { params: Promise<{ id: string }> };
 

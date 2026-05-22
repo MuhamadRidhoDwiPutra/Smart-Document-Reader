@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getEnv } from "../../../../env";
+import { getEnv } from "../../../lib/env";
 import { hashPassword } from "@/lib/password";
 
 export async function POST(request: Request) {

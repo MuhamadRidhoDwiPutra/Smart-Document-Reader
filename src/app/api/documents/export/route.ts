@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { listDocuments } from "@/lib/documents";
-import { getEnv } from "../../../../../env";
+import { getEnv } from "../../../../lib/env";
 
 function esc(v: string | number | null | undefined): string {
   const s = v == null ? "" : String(v);

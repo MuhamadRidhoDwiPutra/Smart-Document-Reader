@@ -1,4 +1,4 @@
-import { getEnv, getLowConfidenceThreshold } from "../../env";
+import { getEnv, getLowConfidenceThreshold } from "./env";
 import type { Document, DocumentStatus, LineItem } from "./types";
 import { formatExtractionError } from "./errors";
 import { extractFromImage, needsReview } from "./extract";
