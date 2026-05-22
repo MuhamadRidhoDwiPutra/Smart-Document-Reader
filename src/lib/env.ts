@@ -1,4 +1,3 @@
-/// <reference path="../../cloudflare-env.d.ts" />
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export interface AppEnv {
