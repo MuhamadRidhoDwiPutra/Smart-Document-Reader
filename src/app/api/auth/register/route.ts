@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const cookieStore = await cookies();
   cookieStore.set("sdr_session", sessionId, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: true, // Cloudflare Workers always use HTTPS
     sameSite: "lax",
     path: "/",
     maxAge: 14 * 24 * 60 * 60,

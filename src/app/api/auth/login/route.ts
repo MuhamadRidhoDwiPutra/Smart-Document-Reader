@@ -10,10 +10,11 @@ export async function POST(request: Request) {
   const res = NextResponse.json({ ok: true });
 
   // Set cookie using the proper Next.js cookies API
+  // In Cloudflare Workers, always use secure=true since it's always HTTPS
   const cookieStore = await cookies();
   cookieStore.set("sdr_session", result.sessionId, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: true, // Cloudflare Workers always use HTTPS
     sameSite: "lax",
     path: "/",
     maxAge: 14 * 24 * 60 * 60, // 14 days in seconds

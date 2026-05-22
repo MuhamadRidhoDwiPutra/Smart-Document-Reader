@@ -37,6 +37,7 @@
   },
 
   "vars": {
-    "LOW_CONFIDENCE_THRESHOLD": "0.7"
+    "LOW_CONFIDENCE_THRESHOLD": "0.7",
+    "SEED_SECRET": "local-dev-seed-only"
   }
 }
